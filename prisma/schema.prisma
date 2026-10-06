@@ -1,0 +1,177 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+  STAFF
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ComplaintStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  ASSIGNED
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  RESOLVED
+}
+
+enum ImageKind {
+  INITIAL
+  COMPLETION
+}
+
+model User {
+  id           String        @id @default(cuid())
+  name         String
+  email        String        @unique
+  phone        String
+  passwordHash String
+  role         Role          @default(USER)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  staffProfile StaffProfile?
+  complaints   Complaint[]   @relation("Reporter")
+  feedback     Feedback[]
+  flags        AdminFlag[]   @relation("FlaggedBy")
+}
+
+model Department {
+  id          String         @id @default(cuid())
+  code        String         @unique
+  name        String
+  description String
+  categories  String[]
+  createdAt   DateTime       @default(now())
+  staff       StaffProfile[]
+  complaints  Complaint[]
+  assignments ComplaintAssignment[]
+}
+
+model StaffProfile {
+  id           String     @id @default(cuid())
+  userId       String     @unique
+  departmentId String
+  title        String?
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id])
+  assignments  ComplaintAssignment[]
+}
+
+model Complaint {
+  id                  String              @id @default(cuid())
+  ticketId            String              @unique
+  userId              String
+  departmentId        String
+  category            String
+  description         String
+  severity            Severity            @default(MEDIUM)
+  latitude            Float
+  longitude           Float
+  locationText        String
+  landmark            String?
+  status              ComplaintStatus     @default(SUBMITTED)
+  possibleDuplicateId String?
+  isFlagged           Boolean             @default(false)
+  flagReason          String?
+  completedAt         DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  reporter            User                @relation("Reporter", fields: [userId], references: [id])
+  department          Department          @relation(fields: [departmentId], references: [id])
+  possibleDuplicate   Complaint?          @relation("PossibleDuplicate", fields: [possibleDuplicateId], references: [id])
+  duplicateReports    Complaint[]         @relation("PossibleDuplicate")
+  images              ComplaintImage[]
+  assignments         ComplaintAssignment[]
+  statusHistory       ComplaintStatusHistory[]
+  feedback            Feedback?
+  flags               AdminFlag[]
+  @@index([latitude, longitude])
+  @@index([departmentId, status])
+  @@index([userId, createdAt])
+}
+
+model ComplaintImage {
+  id          String    @id @default(cuid())
+  complaintId String
+  kind        ImageKind
+  dataUrl     String    @db.Text
+  fileName    String
+  mimeType    String
+  createdAt   DateTime  @default(now())
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  @@index([complaintId, kind])
+}
+
+model ComplaintAssignment {
+  id          String     @id @default(cuid())
+  complaintId String
+  staffId     String
+  departmentId String
+  acceptedAt  DateTime   @default(now())
+  completedAt DateTime?
+  complaint   Complaint  @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  staff       StaffProfile @relation(fields: [staffId], references: [id])
+  department  Department @relation(fields: [departmentId], references: [id])
+  @@unique([complaintId, staffId])
+  @@index([staffId, acceptedAt])
+}
+
+model ComplaintStatusHistory {
+  id          String          @id @default(cuid())
+  complaintId String
+  status      ComplaintStatus
+  message     String?
+  actorName   String?
+  departmentName String?
+  createdAt   DateTime        @default(now())
+  complaint   Complaint       @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  @@index([complaintId, createdAt])
+}
+
+model Feedback {
+  id          String    @id @default(cuid())
+  complaintId String?   @unique
+  userId      String
+  rating      Int?
+  wentWell    String?
+  improve     String?
+  comments    String?
+  category    String    @default("Complaint service")
+  createdAt   DateTime  @default(now())
+  complaint   Complaint? @relation(fields: [complaintId], references: [id], onDelete: SetNull)
+  user        User      @relation(fields: [userId], references: [id])
+}
+
+model AdminFlag {
+  id          String    @id @default(cuid())
+  complaintId String
+  adminId     String
+  reason      String
+  underReview Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  admin       User      @relation("FlaggedBy", fields: [adminId], references: [id])
+  @@index([complaintId, createdAt])
+}
+
+model TicketCounter {
+  year       Int      @id
+  lastNumber Int      @default(0)
+  updatedAt  DateTime @updatedAt
+}

@@ -1,0 +1,5 @@
+import Link from "next/link";
+
+export default function HowItWorksPage() {
+  return <div className="page"><div className="page-head"><div className="container"><h1>How Civic Reporter works</h1><p>A transparent path from your neighbourhood report to a department update.</p></div></div><div className="container content form-shell"><div className="timeline">{["Report your issue with a category, photograph and a short description.","Confirm the location using your device location or the interactive map.","Review nearby reports. Similar active issues are shown but never automatically block a genuine new report.","Civic Reporter sends it to the mapped department and creates a ticket.","Department staff accept the task, log their work and upload completion evidence.","Track the timeline using your ticket ID and share feedback when the work is completed."].map((text,index)=><div className="timeline-item latest" key={text}><span className="timeline-dot"/><h3>Step {index+1}</h3><p className="muted">{text}</p></div>)}</div><Link href="/report" className="button">Report an Issue</Link></div></div>;
+}

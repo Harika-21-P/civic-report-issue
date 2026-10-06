@@ -1,0 +1,6 @@
+"use client";
+
+import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
+
+export default function TrackPage() { const router=useRouter();const [ticket,setTicket]=useState("");const [error,setError]=useState("");const submit=(event:FormEvent)=>{event.preventDefault();const normalized=ticket.trim().toUpperCase();if(!/^CR-\d{4}-\d{6}$/.test(normalized)){setError("Enter your ticket ID in the format CR-2026-000123.");return;}router.push(`/track/${normalized}`);};return <div className="page"><div className="page-head"><div className="container"><h1>Track a complaint</h1><p>Enter your Civic Reporter ticket ID to see its progress timeline.</p></div></div><div className="container content form-shell"><form className="form-card" onSubmit={submit}><div className="field"><label htmlFor="ticket">Ticket ID</label><input id="ticket" placeholder="CR-2026-000123" value={ticket} onChange={e=>{setTicket(e.target.value);setError("");}} autoCapitalize="characters"/><div className="field-help">Your ID was shown after you submitted the report.</div></div>{error&&<div className="alert error">{error}</div>}<button className="button">Track Complaint</button></form></div></div>; }

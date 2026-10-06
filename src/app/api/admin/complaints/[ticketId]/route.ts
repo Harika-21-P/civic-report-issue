@@ -1,0 +1,9 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { ComplaintStatus } from "@prisma/client";
+import { requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { apiError, authError } from "@/lib/api";
+
+const updateSchema = z.object({ departmentCode: z.string().optional(), flagReason: z.string().trim().min(5).max(1000).optional(), underReview: z.boolean().optional() });
+export async function PATCH(request: Request, { params }: { params: { ticketId:string } }) { try { const admin=await requireUser(["ADMIN"]);const parsed=updateSchema.safeParse(await request.json());if(!parsed.success)return apiError(parsed.error.issues[0].message);const complaint=await prisma.complaint.findUnique({where:{ticketId:params.ticketId.toUpperCase()},include:{department:true}});if(!complaint)return apiError("Complaint not found.",404);const {departmentCode,flagReason,underReview}=parsed.data;let department=complaint.department;if(departmentCode){const next=await prisma.department.findUnique({where:{code:departmentCode}});if(!next)return apiError("Invalid department.");department=next;}await prisma.$transaction(async tx=>{if(department.id!==complaint.departmentId){await tx.complaint.update({where:{id:complaint.id},data:{departmentId:department.id,status:ComplaintStatus.UNDER_REVIEW}});await tx.complaintStatusHistory.create({data:{complaintId:complaint.id,status:ComplaintStatus.UNDER_REVIEW,message:`Reassigned to ${department.name} by administrator.`,actorName:admin.name,departmentName:department.name}});}if(flagReason){await tx.complaint.update({where:{id:complaint.id},data:{isFlagged:true,flagReason}});await tx.adminFlag.create({data:{complaintId:complaint.id,adminId:admin.id,reason:flagReason,underReview:underReview??true}});}});return NextResponse.json({ok:true});}catch(error){return authError(error);} }

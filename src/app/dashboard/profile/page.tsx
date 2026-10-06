@@ -1,0 +1,2 @@
+import { getCurrentUser } from "@/lib/auth";
+export default async function ProfilePage(){const user=await getCurrentUser();if(!user)return null;return <><h1>Profile</h1><p className="dashboard-subtitle">Your citizen account information.</p><div className="form-shell"><div className="detail-list"><div><span>Full name</span><strong>{user.name}</strong></div><div><span>Email</span><strong>{user.email}</strong></div><div><span>Phone number</span><strong>{user.phone}</strong></div><div><span>Account type</span><strong>Citizen</strong></div></div></div></>;}
