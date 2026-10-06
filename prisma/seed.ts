@@ -22,6 +22,29 @@ async function user(email: string, name: string, phone: string, password: string
 }
 
 async function main() {
+  if (process.env.NODE_ENV === "production") {
+    const requiredVariables = [
+      "ADMIN_EMAIL",
+      "ADMIN_PASSWORD",
+      "ROAD_STAFF_PASSWORD",
+      "ELECTRICAL_STAFF_PASSWORD",
+      "WATER_STAFF_PASSWORD",
+      "WASTE_STAFF_PASSWORD",
+      "DRAINAGE_STAFF_PASSWORD",
+    ] as const;
+    const missingVariables = requiredVariables.filter((name) => !process.env[name]?.trim());
+    if (missingVariables.length > 0) {
+      throw new Error(`Production seeding requires explicit values for: ${missingVariables.join(", ")}.`);
+    }
+
+    const weakPasswords = requiredVariables
+      .filter((name) => name.endsWith("_PASSWORD"))
+      .filter((name) => (process.env[name]?.length ?? 0) < 16);
+    if (weakPasswords.length > 0) {
+      throw new Error(`Use unique passwords of at least 16 characters for: ${weakPasswords.join(", ")}.`);
+    }
+  }
+
   for (const [code, name, description, categories] of departments) {
     await prisma.department.upsert({ where: { code }, update: { name, description, categories: [...categories] }, create: { code, name, description, categories: [...categories] } });
   }
@@ -40,24 +63,26 @@ async function main() {
     await prisma.staffProfile.upsert({ where: { userId: employee.id }, update: { departmentId: byCode[departmentCode].id, title: "Department Officer" }, create: { userId: employee.id, departmentId: byCode[departmentCode].id, title: "Department Officer" } });
   }
 
-  const citizen = await user("citizen.demo@example.com", "Demo Citizen", "9000000010", "Citizen@123", Role.USER);
-  const existing = await prisma.complaint.count();
-  if (!existing) {
-    const samples = [
-      ["CR-2026-000001", "ROAD_POTHOLE", "ROADS", "Large pothole near the bus stop. It fills with water after rain.", 19.07605, 72.87760, "Near Central Bus Stop", ComplaintStatus.IN_PROGRESS],
-      ["CR-2026-000002", "ROAD_POTHOLE", "ROADS", "Deep pothole beside the same junction.", 19.07670, 72.87785, "Central Junction", ComplaintStatus.SUBMITTED],
-      ["CR-2026-000003", "STREETLIGHT", "ELECTRICAL", "Streetlight has been off for three nights.", 19.07820, 72.88050, "Market Road", ComplaintStatus.ASSIGNED],
-      ["CR-2026-000004", "WATER_LEAKAGE", "WATER", "Water leaking from the main pipeline.", 19.07390, 72.87560, "Park Lane", ComplaintStatus.RESOLVED],
-    ] as const;
-    for (const [ticketId, category, code, description, latitude, longitude, locationText, status] of samples) {
-      const complaint = await prisma.complaint.create({ data: { ticketId, category, description, latitude, longitude, locationText, severity: Severity.HIGH, status, userId: citizen.id, departmentId: byCode[code].id } });
-      await prisma.complaintImage.create({ data: { complaintId: complaint.id, kind: ImageKind.INITIAL, dataUrl: tinyImage, fileName: "demo-issue.svg", mimeType: "image/svg+xml" } });
-      await prisma.complaintStatusHistory.create({ data: { complaintId: complaint.id, status: ComplaintStatus.SUBMITTED, message: "Complaint submitted through Civic Reporter.", actorName: citizen.name, departmentName: byCode[code].name } });
-      if (status !== ComplaintStatus.SUBMITTED) await prisma.complaintStatusHistory.create({ data: { complaintId: complaint.id, status, message: status === ComplaintStatus.RESOLVED ? "Issue has been resolved." : "Department is processing this issue.", actorName: "Department team", departmentName: byCode[code].name } });
+  if (process.env.NODE_ENV !== "production") {
+    const citizen = await user("citizen.demo@example.com", "Demo Citizen", "9000000010", "Citizen@123", Role.USER);
+    const existing = await prisma.complaint.count();
+    if (!existing) {
+      const samples = [
+        ["CR-2026-000001", "ROAD_POTHOLE", "ROADS", "Large pothole near the bus stop. It fills with water after rain.", 19.07605, 72.87760, "Near Central Bus Stop", ComplaintStatus.IN_PROGRESS],
+        ["CR-2026-000002", "ROAD_POTHOLE", "ROADS", "Deep pothole beside the same junction.", 19.07670, 72.87785, "Central Junction", ComplaintStatus.SUBMITTED],
+        ["CR-2026-000003", "STREETLIGHT", "ELECTRICAL", "Streetlight has been off for three nights.", 19.07820, 72.88050, "Market Road", ComplaintStatus.ASSIGNED],
+        ["CR-2026-000004", "WATER_LEAKAGE", "WATER", "Water leaking from the main pipeline.", 19.07390, 72.87560, "Park Lane", ComplaintStatus.RESOLVED],
+      ] as const;
+      for (const [ticketId, category, code, description, latitude, longitude, locationText, status] of samples) {
+        const complaint = await prisma.complaint.create({ data: { ticketId, category, description, latitude, longitude, locationText, severity: Severity.HIGH, status, userId: citizen.id, departmentId: byCode[code].id } });
+        await prisma.complaintImage.create({ data: { complaintId: complaint.id, kind: ImageKind.INITIAL, dataUrl: tinyImage, fileName: "demo-issue.svg", mimeType: "image/svg+xml" } });
+        await prisma.complaintStatusHistory.create({ data: { complaintId: complaint.id, status: ComplaintStatus.SUBMITTED, message: "Complaint submitted through Civic Reporter.", actorName: citizen.name, departmentName: byCode[code].name } });
+        if (status !== ComplaintStatus.SUBMITTED) await prisma.complaintStatusHistory.create({ data: { complaintId: complaint.id, status, message: status === ComplaintStatus.RESOLVED ? "Issue has been resolved." : "Department is processing this issue.", actorName: "Department team", departmentName: byCode[code].name } });
+      }
+      await prisma.ticketCounter.upsert({ where: { year: 2026 }, update: { lastNumber: 4 }, create: { year: 2026, lastNumber: 4 } });
+      const resolved = await prisma.complaint.findUniqueOrThrow({ where: { ticketId: "CR-2026-000004" } });
+      await prisma.feedback.create({ data: { complaintId: resolved.id, userId: citizen.id, rating: 5, wentWell: "The repair team was prompt.", improve: "A clearer arrival estimate would help.", comments: "Thank you for fixing the water leak.", category: "Complaint service" } });
     }
-    await prisma.ticketCounter.upsert({ where: { year: 2026 }, update: { lastNumber: 4 }, create: { year: 2026, lastNumber: 4 } });
-    const resolved = await prisma.complaint.findUniqueOrThrow({ where: { ticketId: "CR-2026-000004" } });
-    await prisma.feedback.create({ data: { complaintId: resolved.id, userId: citizen.id, rating: 5, wentWell: "The repair team was prompt.", improve: "A clearer arrival estimate would help.", comments: "Thank you for fixing the water leak.", category: "Complaint service" } });
   }
   console.log(`Seeded Civic Reporter accounts. Admin ID: ${admin.id}`);
 }

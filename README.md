@@ -54,10 +54,22 @@ demonstrated. Change all demo passwords before any non-expo deployment.
 ## Vercel
 
 1. Import this repository into Vercel.
-2. Set `DATABASE_URL` and `SESSION_SECRET` in Vercel project environment variables.
-3. Apply the schema once from a trusted machine or CI: `npm run db:push`.
+2. Attach the Neon project to the Vercel project or set `DATABASE_URL` to the
+   Neon pooled PostgreSQL connection string. Set a unique, random
+   `SESSION_SECRET` (at least 32 characters) in Vercel environment variables.
+   Keep both values server-only; do not use a `NEXT_PUBLIC_` prefix.
+3. Apply the Prisma schema to the intended Neon database/branch from a trusted
+   machine or CI with `npm run db:push`. Do this before the first deployment;
+   the Vercel build does not modify the database schema.
 4. Use the default build command, `npm run build`; it runs `prisma generate`
    before `next build`.
+5. If initial admin/staff accounts are required, run `npm run db:seed` only
+   once from a trusted machine or CI with `NODE_ENV=production` and
+   `ADMIN_EMAIL` plus all six account password variables set in that process.
+   Use unique passwords of at least 16 characters; do not put them in the
+   repository. Production seeding rejects missing/weak credentials and does
+   not create demo citizens or sample complaints. Never use the documented
+   demo passwords on a production database.
 
 No local uploads directory is used. Client images are resized to JPEG in the
 browser, validated again on the server, and saved in PostgreSQL text storage.

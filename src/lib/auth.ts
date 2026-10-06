@@ -10,7 +10,12 @@ const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 
 function secret() {
   const value = process.env.SESSION_SECRET;
-  if (!value && process.env.NODE_ENV === "production") throw new Error("SESSION_SECRET is required in production.");
+  if (
+    process.env.NODE_ENV === "production" &&
+    (!value || value.length < 32 || value.startsWith("replace-with-"))
+  ) {
+    throw new Error("Set SESSION_SECRET to a unique random value of at least 32 characters in production.");
+  }
   return value || "development-only-civic-reporter-secret-change-me";
 }
 
