@@ -7,8 +7,8 @@ status update in Neon PostgreSQL.
 
 ## Local setup
 
-1. Create a Neon PostgreSQL database and copy its pooled `postgresql://` connection string.
-2. Copy `.env.example` to `.env` and set `DATABASE_URL` and a long `SESSION_SECRET`.
+1. Create a Neon PostgreSQL database and copy its pooled and direct `postgresql://` connection strings.
+2. Copy `.env.example` to `.env` and set `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, and a long `SESSION_SECRET`.
 3. Install and initialise the database:
 
    ```powershell
@@ -29,7 +29,8 @@ deploying the application.
 
 | Variable | Purpose |
 | --- | --- |
-| `DATABASE_URL` | Server-only Neon PostgreSQL connection string. |
+| `DATABASE_URL` | Server-only pooled Neon PostgreSQL connection string used by the application. |
+| `DATABASE_URL_UNPOOLED` | Server-only direct Neon PostgreSQL connection string used by Prisma schema-management commands. |
 | `SESSION_SECRET` | A random 32+ character secret used to sign HTTP-only login cookies. |
 
 The demo account password variables in `.env.example` are optional, server-side
